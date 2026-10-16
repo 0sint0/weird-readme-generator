@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weird README Generator</title>
+<meta name="description" content="Paste a folder structure, get a funny or minimalist README. Runs entirely in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E8EBEF;
+    --panel: #F8F9FA;
+    --ink: #1A2233;
+    --muted: #5B6577;
+    --line: #C9CFD8;
+    --accent: #F2B632;
+    --accent-ink: #1A2233;
+    --code-bg: #EEF0F3;
+    --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161D;
+      --panel: #1A2029;
+      --ink: #E8ECF2;
+      --muted: #8F9BAE;
+      --line: #2C3441;
+      --code-bg: #141920;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 20px 56px; }
+
+  header { margin-bottom: 28px; }
+  h1 {
+    font-weight: 800;
+    font-size: clamp(2.4rem, 7vw, 4.6rem);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    margin: 0 0 12px;
+    max-width: 14ch;
+  }
+  .sub { color: var(--muted); max-width: 52ch; margin: 0; font-size: 1.05rem; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: end;
+    margin: 28px 0 20px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label, .field .lab { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+  input[type="text"] {
+    font: inherit; color: var(--ink); background: var(--panel);
+    border: 1.5px solid var(--line); border-radius: 6px;
+    padding: 9px 12px; min-width: 220px;
+  }
+
+  /* The one memorable thing: a chunky tone switch with a hard offset shadow */
+  .tone { display: inline-flex; border: 2px solid var(--ink); border-radius: 8px; background: var(--panel); box-shadow: 4px 4px 0 var(--ink); }
+  .tone input { position: absolute; opacity: 0; pointer-events: none; }
+  .tone label {
+    padding: 9px 20px; font-weight: 800; font-size: 1.05rem; cursor: pointer;
+    border-right: 2px solid var(--ink); color: var(--ink);
+    transition: background 0.12s;
+  }
+  .tone label:last-of-type { border-right: 0; }
+  .tone input:checked + label { background: var(--accent); color: var(--accent-ink); }
+  .tone input:focus-visible + label { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; color: var(--ink);
+    background: var(--panel); border: 1.5px solid var(--ink); border-radius: 6px;
+    padding: 8px 14px;
+  }
+  button:hover { background: var(--accent); color: var(--accent-ink); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button.quiet { border-color: var(--line); color: var(--muted); }
+  button.quiet:hover { border-color: var(--ink); color: var(--accent-ink); }
+
+  .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1.5px solid var(--line); border-radius: 10px;
+    display: flex; flex-direction: column; min-width: 0;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 12px 14px; border-bottom: 1.5px solid var(--line);
+  }
+  .panel-head h2 { margin: 0; font-size: 1rem; font-weight: 800; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  textarea {
+    flex: 1; width: 100%; min-height: 440px; resize: vertical;
+    border: 0; background: transparent; color: var(--ink);
+    font-family: var(--mono); font-size: 0.86rem; line-height: 1.55;
+    padding: 14px; tab-size: 4; white-space: pre; overflow: auto;
+  }
+  .out { flex: 1; min-height: 440px; max-height: 720px; overflow: auto; padding: 14px; }
+  pre.raw {
+    margin: 0; font-family: var(--mono); font-size: 0.84rem; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .empty { color: var(--muted); }
+
+  .tabs { display: inline-flex; border: 1.5px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .tabs button { border: 0; border-radius: 0; padding: 6px 12px; background: transparent; color: var(--muted); }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); }
+
+  /* rendered markdown */
+  .md { max-width: 68ch; }
+  .md h1 { font-size: 2rem; letter-spacing: -0.02em; margin: 0 0 8px; max-width: none; line-height: 1.1; }
+  .md h2 { font-size: 1.25rem; margin: 24px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid var(--line); }
+  .md p, .md ul, .md ol, .md blockquote { margin: 0 0 12px; }
+  .md blockquote { border-left: 4px solid var(--accent); padding-left: 12px; color: var(--muted); }
+  .md code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .md pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0 0 12px; }
+  .md pre code { background: none; padding: 0; font-size: 0.82rem; line-height: 1.5; }
+  .md .badge { display: inline-block; font-size: 0.75rem; font-weight: 600; background: var(--ink); color: var(--panel); padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--ink); color: var(--panel); padding: 9px 16px; border-radius: 6px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s;
+  }
+  .toast.show { opacity: 1; }
+
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.9rem; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>README, but make it weird</h1>
+    <p class="sub">Paste a folder structure. Get a README that either roasts your project or says as little as possible.</p>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <span class="lab" id="toneLab">Tone</span>
+      <div class="tone" role="radiogroup" aria-labelledby="toneLab">
+        <input type="radio" name="tone" id="tFunny" value="funny" checked>
+        <label for="tFunny">Funny</label>
+        <input type="radio" name="tone" id="tMin" value="minimal">
+        <label for="tMin">Minimal</label>
+      </div>
+    </div>
+    <div class="field">
+      <label for="pname">Project name (optional)</label>
+      <input type="text" id="pname" placeholder="taken from the root folder">
+    </div>
+    <div class="field">
+      <label for="pdesc">One-line description (optional)</label>
+      <input type="text" id="pdesc" placeholder="what it actually does">
+    </div>
+    <button id="reroll" class="quiet" title="Pick different jokes">Reroll jokes</button>
+  </div>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="inH">
+      <div class="panel-head">
+        <h2 id="inH">Your folder structure</h2>
+        <div class="row">
+          <button id="sample" class="quiet">Load an example</button>
+          <button id="clear" class="quiet">Clear</button>
+        </div>
+      </div>
+      <textarea id="input" spellcheck="false" aria-label="Folder structure" placeholder="Paste output from `tree`, an indented list, or plain paths like:&#10;&#10;src/main.py&#10;src/utils.py&#10;tests/&#10;Dockerfile"></textarea>
+    </section>
+
+    <section class="panel" aria-labelledby="outH">
+      <div class="panel-head">
+        <h2 id="outH">Your README.md</h2>
+        <div class="row">
+          <div class="tabs" role="tablist">
+            <button role="tab" id="tabRaw" aria-selected="true">Markdown</button>
+            <button role="tab" id="tabPrev" aria-selected="false">Preview</button>
+          </div>
+          <button id="copy">Copy</button>
+          <button id="download">Download</button>
+        </div>
+      </div>
+      <div class="out" id="out" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <footer>Everything runs in your browser. Nothing is uploaded, and there are no dependencies.</footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SAMPLE = [
+    'haunted-toaster/',
+    '├── src/',
+    '│   ├── main.py',
+    '│   ├── utils.py',
+    '│   └── toast_final_v2.py',
+    '├── tests/',
+    '├── docs/',
+    '│   └── TODO.txt',
+    '├── misc/',
+    '│   └── stuff.txt',
+    '├── .env',
+    '├── .DS_Store',
+    '├── requirements.txt',
+    '└── Dockerfile'
+  ].join('\n');
+
+  /* ---------- helpers ---------- */
+  function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return h >>> 0; }
+  function makeRng(seed) {
+    var s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      var t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function listJoin(a) {
+    if (a.length <= 1) return a.join('');
+    if (a.length === 2) return a[0] + ' and ' + a[1];
+    return a.slice(0, -1).join(', ') + ', and ' + a[a.length - 1];
+  }
+  function slug(s) { return s.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'project'; }
+
+  /* ---------- parsing ---------- */
+  var KNOWN_FILES = ['dockerfile', 'makefile', 'license', 'licence', 'procfile', 'gemfile', 'rakefile', 'readme', 'todo', 'notes', 'changelog', 'jenkinsfile', 'vagrantfile'];
+  var DOT_DIRS = ['.github', '.vscode', '.git', '.idea', '.venv', '.husky', '.circleci'];
+
+  function parseNodes(text) {
+    var lines = text.replace(/\r/g, '').replace(/\t/g, '    ').split('\n')
+      .filter(function (l) { return l.trim() && !/^\s*```/.test(l); });
+    if (!lines.length) return null;
+
+    var conn = /(├──|└──|\|--|`--|\+--|\\--)\s*/;
+    var treeStyle = lines.some(function (l) { return conn.test(l); });
+    var pathStyle = !treeStyle &&
+      lines.every(function (l) { return !/^\s/.test(l); }) &&
+      lines.some(function (l) { return /\/./.test(l.replace(/^\.\//, '')); });
+
+    var top = { children: [] };
+
+    if (pathStyle) {
+      var idx = new Map();
+      var getKids = function (parent, key) { return parent.__map || (parent.__map = new Map()); };
+      lines.forEach(function (line) {
+        var p = line.trim().replace(/^\.\//, '');
+        var endsSlash = /\/$/.test(p);
+        var parts = p.split('/').filter(Boolean);
+        var cur = top;
+        parts.forEach(function (part, i) {
+          var m = getKids(cur);
+          var node = m.get(part);
+          if (!node) { node = { name: part, dir: false, children: [] }; m.set(part, node); cur.children.push(node); }
+          if (i < parts.length - 1 || endsSlash) node.dir = true;
+          cur = node;
+        });
+      });
+    } else {
+      var raw = [];
+      if (treeStyle) {
+        lines.forEach(function (l) {
+          var m = l.match(conn);
+          if (m) raw.push({ depth: Math.floor(m.index / 4) + 1, name: l.slice(m.index + m[0].length) });
+          else if (!/^[\s│|]/.test(l)) raw.push({ depth: 0, name: l.trim() });
+        });
+      } else {
+        var indents = lines.map(function (l) { return l.match(/^ */)[0].length; });
+        var positive = indents.filter(function (n) { return n > 0; });
+        var unit = positive.length ? Math.min.apply(null, positive) : 1;
+        lines.forEach(function (l, i) {
+          var name = l.trim().replace(/^[-*+]\s+/, '');
+          raw.push({ depth: Math.round(indents[i] / unit), name: name });
+        });
+      }
+      var stack = [{ depth: -1, node: top }];
+      raw.forEach(function (r) {
+        var name = r.name.trim().replace(/\s+(#|\/\/|<--|<-|←)\s.*$/, '').trim();
+        var dir = false;
+        if (/\/+$/.test(name)) { dir = true; name = name.replace(/\/+$/, ''); }
+        if (!name) return;
+        while (stack.length > 1 && stack[stack.length - 1].depth >= r.depth) stack.pop();
+        var node = { name: name, dir: dir, children: [] };
+        stack[stack.length - 1].node.children.push(node);
+        stack.push({ depth: r.depth, node: node });
+      });
+    }
+
+    (function fix(n) {
+      n.children.forEach(function (c) {
+        fix(c);
+        if (c.children.length) c.dir = true;
+        else if (!c.dir) {
+          var low = c.name.toLowerCase();
+          c.dir = DOT_DIRS.indexOf(low) >= 0 || (!/\./.test(c.name) && KNOWN_FILES.indexOf(low) < 0);
+        }
+      });
+    })(top);
+
+    if (!top.children.length) return null;
+    if (top.children.length === 1 && top.children[0].dir && top.children[0].children.length) {
+      return { rootName: top.children[0].name, children: top.children[0].children };
+    }
+    return { rootName: null, children: top.children };
+  }
+
+  function flatten(children) {
+    var out = [];
+    (function walk(kids, depth, path) {
+      kids.forEach(function (k) {
+        var p = path ? path + '/' + k.name : k.name;
+        out.push({ name: k.name, low: k.name.toLowerCase(), path: p, dir: k.dir, depth: depth });
+        if (k.children.length) walk(k.children, depth + 1, p);
+      });
+    })(children, 1, '');
+    return out;
+  }
+
+  /* ---------- analysis ---------- */
+  var LANG = { py: 'Python', js: 'JavaScript', jsx: 'JavaScript', ts: 'TypeScript', tsx: 'TypeScript', rs: 'Rust', go: 'Go', html: 'HTML', css: 'CSS', java: 'Java', rb: 'Ruby', c: 'C', cpp: 'C++', h: 'C', sh: 'Shell', lua: 'Lua', php: 'PHP', swift: 'Swift', kt: 'Kotlin', cs: 'C#', ipynb: 'Jupyter notebooks' };
+
+  function analyze(flat, children) {
+    var names = new Set(), paths = {}, langCount = {};
+    var files = 0, dirs = 0, maxDepth = 0;
+    flat.forEach(function (f) {
+      names.add(f.low);
+      if (!(f.low in paths)) paths[f.low] = f.path;
+      if (f.dir) dirs++; else files++;
+      if (f.depth > maxDepth) maxDepth = f.depth;
+      if (!f.dir) {
+        var m = f.low.match(/\.([a-z0-9]+)$/);
+        if (m && LANG[m[1]]) langCount[LANG[m[1]]] = (langCount[LANG[m[1]]] || 0) + 1;
+      }
+    });
+    var langs = Object.keys(langCount).sort(function (a, b) { return langCount[b] - langCount[a]; }).slice(0, 3);
+    var rootFiles = children.filter(function (c) { return !c.dir; }).length;
+    return {
+      names: names, paths: paths, files: files, dirs: dirs, maxDepth: maxDepth, langs: langs, rootFiles: rootFiles,
+      has: function (n) { return names.has(n); },
+      first: function (arr) { for (var i = 0; i < arr.length; i++) if (names.has(arr[i])) return paths[arr[i]]; return null; },
+      matching: function (re) { return flat.filter(function (f) { return re.test(f.low); }).map(function (f) { return f.name; }); },
+      anyExt: function (e) { return flat.some(function (f) { return !f.dir && f.low.slice(-e.length - 1) === '.' + e; }); }
+    };
+  }
+
+  function runCommands(a, name) {
+    var c = [];
+    if (a.has('package.json')) c.push('npm install', 'npm start');
+    if (a.has('requirements.txt')) c.push('pip install -r requirements.txt');
+    else if (a.has('pyproject.toml')) c.push('pip install .');
+    var py = a.first(['main.py', 'app.py', 'run.py', '__main__.py', 'server.py']);
+    if (py) c.push('python ' + py);
+    if (a.has('cargo.toml')) c.push('cargo run');
+    if (a.has('go.mod')) c.push('go run .');
+    if (a.has('pom.xml')) c.push('mvn package');
+    if (a.has('gemfile')) c.push('bundle install');
+    if (a.has('makefile')) c.push('make');
+    if (a.has('dockerfile')) c.push('docker build -t ' + slug(name) + ' .', 'docker run --rm ' + slug(name));
+    var sh = a.matching(/\.sh$/)[0];
+    if (sh && !c.length) c.push('chmod +x ' + a.paths[sh.toLowerCase()] + ' && ./' + a.paths[sh.toLowerCase()]);
+    if (a.anyExt('ipynb')) c.push('jupyter notebook');
+    if (a.has('index.html') && !a.has('package.json')) c.push('open index.html   # or just double-click it');
+    return c;
+  }
+
+  /* ---------- annotated tree ---------- */
+  var NOTES = {
+    'src': 'where the magic happens (and the bugs)', 'lib': "other people's code, spiritually",
+    'tests': 'aspirational', 'test': 'aspirational', 'docs': 'written once, trusted never', 'doc': 'written once, trusted never',
+    'utils': 'the junk drawer', 'util': 'the junk drawer', 'helpers': 'the junk drawer',
+    'misc': 'nobody knows. nobody asks.', 'stuff': 'nobody knows. nobody asks.', 'temp': 'nobody knows. nobody asks.', 'tmp': 'nobody knows. nobody asks.',
+    'old': 'nobody knows. nobody asks.', 'backup': 'nobody knows. nobody asks.', 'archive': 'nobody knows. nobody asks.', 'junk': 'nobody knows. nobody asks.',
+    'node_modules': 'heavier than a neutron star', '.env': 'secrets. eyes off.', '.gitignore': "things we pretend don't exist",
+    'dockerfile': 'works on my machine, now in a box', 'makefile': 'ancient incantations', 'license': 'legal stuff, allegedly',
+    'todo.txt': 'the real roadmap', 'todo.md': 'the real roadmap', 'todo': 'the real roadmap',
+    'notes.txt': 'thoughts at 3am', 'notes.md': 'thoughts at 3am', 'notes': 'thoughts at 3am',
+    'main.py': 'start here', 'main.js': 'start here', 'main.go': 'start here', 'main.rs': 'start here', 'index.js': 'start here', 'app.py': 'start here',
+    'index.html': 'the whole show', 'requirements.txt': "pip's shopping list", 'package.json': 'the dependency iceberg',
+    'package-lock.json': "13,000 lines nobody has read", '.ds_store': 'macOS leaves its fingerprints',
+    'assets': 'the pretty things', 'static': 'the pretty things', 'public': 'the pretty things', 'config': 'knobs and dials', 'configs': 'knobs and dials',
+    'scripts': 'one-off scripts that became load-bearing', 'build': "generated. don't touch.", 'dist': "generated. don't touch.", 'data': 'the good stuff',
+    '.github': 'automation, hopefully', 'venv': 'a whole Python in a trench coat', '.venv': 'a whole Python in a trench coat', '__pycache__': "python's crumbs"
+  };
+  var EXT_NOTES = { txt: 'a text file. riveting.', json: 'curly braces, mostly', yml: 'indentation is load-bearing', yaml: 'indentation is load-bearing', log: 'a diary of failures', csv: 'comma-separated sadness', png: 'a picture, probably', jpg: 'a picture, probably', sh: 'bash and hope', lock: 'do not edit by hand' };
+
+  function noteFor(node, rand) {
+    var low = node.name.toLowerCase();
+    if (NOTES[low]) return NOTES[low];
+    if (/(final|_v\d|-v\d|v\d+\.|copy|backup|_bak|\(\d\)|_new|_old)/.test(low)) return 'naming convention: panic';
+    var m = low.match(/\.([a-z0-9]+)$/);
+    if (m && EXT_NOTES[m[1]] && rand() < 0.5) return EXT_NOTES[m[1]];
+    return null;
+  }
+
+  function renderTree(rootName, children, annotate, rand) {
+    var rows = [{ text: rootName + '/', note: null }];
+    (function walk(kids, prefix) {
+      kids.forEach(function (k, i) {
+        var last = i === kids.length - 1;
+        rows.push({ text: prefix + (last ? '└── ' : '├── ') + k.name + (k.dir ? '/' : ''), note: annotate ? noteFor(k, rand) : null });
+        if (k.children.length) walk(k.children, prefix + (last ? '    ' : '│   '));
+      });
+    })(children, '');
+    var width = 0;
+    rows.forEach(function (r) { if (r.text.length > width) width = r.text.length; });
+    return rows.map(function (r) { return r.note ? r.text + new Array(width - r.text.length + 3).join(' ') + '# ' + r.note : r.text; }).join('\n');
+  }
+
+  /* ---------- README writers ---------- */
+  var TAGLINES = ['Probably works.', 'Now with 100% more files.', 'Built with caffeine and questionable decisions.', 'It compiles. Emotionally.', 'Somewhere, a linter is crying.', 'Held together by vibes and a .gitignore.'];
+  var ABOUT = [
+    '{n} is a software project. It has {f} files in {d} folders and, at last count, zero regrets.',
+    '{n} contains {f} files across {d} folders. Nobody asked for it. It exists anyway.',
+    "Behold {n}: {f} files, {d} folders, and a developer who said 'one more feature' about {f} times ago.",
+    '{n} is {f} files wearing a trench coat and pretending to be an application.'
+  ];
+  var RUN_AFTER = ['If it breaks, turn it off and on again.', 'If it works the first time, please do not tell anyone. It will get nervous.', 'Errors are features in disguise.', 'Side effects may include learning.'];
+  var NO_RUN = 'No build or run files found. Read the code, form an opinion, proceed boldly.';
+  var CONTRIB = [
+    'Pull requests are welcome. Please include a description, a test, and a snack.',
+    'Found a bug? Congratulations, you now own it. Open an issue or send a fix.',
+    'Contributions welcome. Please keep the chaos consistent with the existing chaos.'
+  ];
+  var LICENSE_JOKES = ['MIT. Do what you want, just do not blame me.', 'MIT. Take it, break it, fix it, ship it.'];
+
+  function observations(a, flat, rand) {
+    var o = [];
+    if (a.has('node_modules')) o.push('`node_modules` is in here. Please do not commit it. We both know you were about to.');
+    if (a.has('.env')) o.push('A `.env` file is present. If this repo is public, rotate those secrets now. Seriously.');
+    if (a.has('.ds_store')) o.push('A `.DS_Store` snuck in. Add it to `.gitignore` and move on with your life.');
+    var panic = a.matching(/(final|_v\d|-v\d|v\d+\.|copy|backup|_bak|\(\d\)|_new|_old)/);
+    if (panic.length) o.push('Found `' + panic.slice(0, 3).join('`, `') + '`. The naming scheme is a cry for help.');
+    var junk = a.matching(/^(misc|stuff|temp|tmp|junk|old|backup)$/);
+    if (junk.length) o.push('The `' + junk[0] + '` folder is a mystery. Entering is at your own risk.');
+    if (a.has('tests') || a.has('test')) o.push('There is a tests folder. Whether the tests pass is a mystery for the ages.');
+    else o.push('No tests. The code is confident, and that is all we know.');
+    if (a.maxDepth >= 5) o.push('Folders nested ' + a.maxDepth + ' levels deep. Bring snacks.');
+    if (a.rootFiles > 10) o.push(a.rootFiles + ' files in the root folder. Marie Kondo has been notified.');
+    if (a.matching(/^todo/).length) o.push('There is a TODO file. It is the real roadmap.');
+    if (!a.has('license') && !a.has('licence')) o.push('No LICENSE file. Legally, this is a vibes-based project.');
+    if (a.files < 3) o.push('Barely any files here. Minimalism or procrastination, unclear.');
+    if (a.has('venv') || a.has('.venv')) o.push('A virtual environment is checked in. It is a Python inside your Python.');
+    if (a.has('__pycache__')) o.push('`__pycache__` is here. Python left crumbs.');
+    return o;
+  }
+
+  function pick(arr, rand) { return arr[Math.floor(rand() * arr.length)]; }
+
+  function writeFunny(ctx) {
+    var rand = ctx.rand, a = ctx.a, n = ctx.name;
+    var L = [];
+    L.push('# ' + n, '');
+    L.push('> ' + pick(TAGLINES, rand), '');
+    L.push('![works on my machine](https://img.shields.io/badge/works%20on-my%20machine-brightgreen)', '');
+    L.push('## What is this?', '');
+    L.push(ctx.desc ? ctx.desc : pick(ABOUT, rand).replace(/\{n\}/g, n).replace(/\{f\}/g, a.files).replace(/\{d\}/g, a.dirs), '');
+    if (a.langs.length) L.push('It is written mostly in ' + listJoin(a.langs) + ', for reasons lost to time.', '');
+    L.push('## The lay of the land', '', '```', renderTree(n, ctx.children, true, rand), '```', '');
+    L.push('## How to run it', '');
+    var cmds = runCommands(a, n);
+    L.push('```bash', 'git clone https://github.com/YOUR-USERNAME/' + slug(n) + '.git', 'cd ' + slug(n));
+    cmds.forEach(function (c) { L.push(c); });
+    L.push('```', '');
+    L.push(cmds.length ? pick(RUN_AFTER, rand) : NO_RUN, '');
+    var obs = observations(a, ctx.flat, rand);
+    if (obs.length) {
+      L.push('## Things you might notice', '');
+      obs.slice(0, 6).forEach(function (o) { L.push('- ' + o); });
+      L.push('');
+    }
+    L.push('## Contributing', '', pick(CONTRIB, rand), '');
+    L.push('## License', '', (a.has('license') || a.has('licence')) ? 'See `LICENSE`. Read it, or do not. We are not your boss.' : pick(LICENSE_JOKES, rand) + ' (Add a `LICENSE` file to make it official.)', '');
+    return L.join('\n');
+  }
+
+  function writeMinimal(ctx) {
+    var a = ctx.a, n = ctx.name, L = [];
+    L.push('# ' + n, '');
+    L.push(ctx.desc ? ctx.desc : (a.langs.length ? 'A ' + a.langs[0] + ' project.' : 'A small project.'), '');
+    L.push('## Structure', '', '```', renderTree(n, ctx.children, false, ctx.rand), '```', '');
+    var cmds = runCommands(a, n);
+    L.push('## Usage', '');
+    if (cmds.length) { L.push('```bash'); cmds.forEach(function (c) { L.push(c); }); L.push('```', ''); }
+    else L.push('No build step.', '');
+    L.push('## License', '', (a.has('license') || a.has('licence')) ? 'See `LICENSE`.' : 'MIT', '');
+    return L.join('\n');
+  }
+
+  /* ---------- tiny markdown renderer (for our own output) ---------- */
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function inline(s) {
+    return esc(s)
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '<span class="badge">$1</span>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
+  function renderMd(src) {
+    var out = '', list = null, inCode = false, code = [];
+    var closeList = function () { if (list) { out += '</' + list + '>'; list = null; } };
+    src.split('\n').forEach(function (line) {
+      if (/^```/.test(line)) {
+        if (inCode) { out += '<pre><code>' + esc(code.join('\n')) + '</code></pre>'; code = []; inCode = false; }
+        else { closeList(); inCode = true; }
+        return;
+      }
+      if (inCode) { code.push(line); return; }
+      var m;
+      if ((m = line.match(/^(#{1,2})\s+(.*)$/))) { closeList(); out += '<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>'; }
+      else if ((m = line.match(/^>\s?(.*)$/))) { closeList(); out += '<blockquote>' + inline(m[1]) + '</blockquote>'; }
+      else if ((m = line.match(/^[-*]\s+(.*)$/))) { if (list !== 'ul') { closeList(); out += '<ul>'; list = 'ul'; } out += '<li>' + inline(m[1]) + '</li>'; }
+      else if (!line.trim()) { closeList(); }
+      else { closeList(); out += '<p>' + inline(line) + '</p>'; }
+    });
+    closeList();
+    return out;
+  }
+
+  /* ---------- UI ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $('input'), out = $('out'), pname = $('pname'), pdesc = $('pdesc');
+  var seedOffset = 0, view = 'raw', current = '';
+
+  function tone() { return document.querySelector('input[name="tone"]:checked').value; }
+
+  function generate() {
+    var text = input.value;
+    var parsed = parseNodes(text);
+    if (!parsed) {
+      current = '';
+      out.innerHTML = '<p class="empty">Paste a folder structure on the left and your README shows up here. Output from <code>tree</code>, an indented list, or plain file paths all work.</p>';
+      return;
+    }
+    var flat = flatten(parsed.children);
+    var a = analyze(flat, parsed.children);
+    var name = pname.value.trim() || parsed.rootName || 'my-project';
+    var ctx = {
+      children: parsed.children, flat: flat, a: a, name: name,
+      desc: pdesc.value.trim(), rand: makeRng(hash(text) + seedOffset * 7919)
+    };
+    current = tone() === 'funny' ? writeFunny(ctx) : writeMinimal(ctx);
+    if (view === 'raw') {
+      var pre = document.createElement('pre');
+      pre.className = 'raw';
+      pre.textContent = current;
+      out.innerHTML = '';
+      out.appendChild(pre);
+    } else {
+      out.innerHTML = '<div class="md">' + renderMd(current) + '</div>';
+    }
+  }
+
+  function setView(v) {
+    view = v;
+    $('tabRaw').setAttribute('aria-selected', v === 'raw');
+    $('tabPrev').setAttribute('aria-selected', v === 'preview');
+    generate();
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1400);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy') ? resolve() : reject(); } catch (e) { reject(e); }
+      document.body.removeChild(ta);
+    });
+  }
+
+  input.addEventListener('input', function () { seedOffset = 0; generate(); });
+  pname.addEventListener('input', generate);
+  pdesc.addEventListener('input', generate);
+  document.querySelectorAll('input[name="tone"]').forEach(function (r) { r.addEventListener('change', generate); });
+  $('reroll').addEventListener('click', function () { seedOffset++; generate(); });
+  $('sample').addEventListener('click', function () { input.value = SAMPLE; seedOffset = 0; generate(); });
+  $('clear').addEventListener('click', function () { input.value = ''; generate(); input.focus(); });
+  $('tabRaw').addEventListener('click', function () { setView('raw'); });
+  $('tabPrev').addEventListener('click', function () { setView('preview'); });
+  $('copy').addEventListener('click', function () {
+    if (!current) { toast('Nothing to copy yet'); return; }
+    copyText(current).then(function () { toast('Copied README.md'); }, function () { toast('Copy failed. Select the text manually.'); });
+  });
+  $('download').addEventListener('click', function () {
+    if (!current) { toast('Nothing to download yet'); return; }
+    var url = URL.createObjectURL(new Blob([current], { type: 'text/markdown' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = 'README.md';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Downloaded README.md');
+  });
+
+  input.value = SAMPLE;
+  generate();
+})();
+</script>
+</body>
+</html>
